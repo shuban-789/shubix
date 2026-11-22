@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 
+#[path = "../common/mod.rs"]
 mod common;
 
 use core::ptr::{read_volatile, write_volatile};
@@ -10,7 +11,7 @@ use core::panic::PanicInfo;
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     loop { 
-        unsafe { asm!("hlt"); }
+        unsafe { asm!("wfe"); }
     }
 }
 
@@ -32,7 +33,7 @@ pub unsafe fn delay(count: i32) {
             "1:",
             "subs {0}, {0}, #1;",
             "bne 1b",
-            inout(reg) count,
+            inout(reg) count => _,
             options(nostack)
         );
     }
@@ -69,57 +70,71 @@ impl Gpio {
 }
 
 pub unsafe fn uart_init() {
-    mmio_write(Gpio::UART0_CR, 0x00000000);
+    unsafe {
+        mmio_write(Gpio::UART0_CR, 0x00000000);
 
-    mmio_write(Gpio::GPPUD, 0x00000000);
-    delay(150);
+        mmio_write(Gpio::GPPUD, 0x00000000);
+        delay(150);
 
-    mmio_write(Gpio::GPPUDCLK0, (1 << 14) | (1 << 15));
-    delay(150);
+        mmio_write(Gpio::GPPUDCLK0, (1 << 14) | (1 << 15));
+        delay(150);
 
-    mmio_write(Gpio::GPPUDCLK0, 0x00000000);
+        mmio_write(Gpio::GPPUDCLK0, 0x00000000);
 
-    mmio_write(Gpio::UART0_ICR, 0x7FF);
+        mmio_write(Gpio::UART0_ICR, 0x7FF);
 
-    mmio_write(Gpio::UART0_IBRD, 1);
-    mmio_write(Gpio::UART0_FBRD, 40);
+        mmio_write(Gpio::UART0_IBRD, 1);
+        mmio_write(Gpio::UART0_FBRD, 40);
 
-    mmio_write(Gpio::UART0_LCRH, (1 << 4) | (1 << 5) | (1 << 6));
+        mmio_write(Gpio::UART0_LCRH, (1 << 4) | (1 << 5) | (1 << 6));
 
-    mmio_write(Gpio::UART0_IMSC, 
-        (1 << 1) | (1 << 4) | (1 << 5) | (1 << 6) |
-        (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10)
-    );
+        mmio_write(Gpio::UART0_IMSC, 
+            (1 << 1) | (1 << 4) | (1 << 5) | (1 << 6) |
+            (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10)
+        );
 
-    mmio_write(Gpio::UART0_CR, (1 << 0) | (1 << 8) | (1 << 9));
-}
-
-pub unsafe fn uart_putc(c: u8) {
-    while mmio_read(Gpio::UART0_FR) & (1 << 5) != 0 {}
-    mmio_write(Gpio::UART0_DR, c);
-}
-
-pub unsafe fn uart_getc() -> u8 {
-    while mmio_read(Gpio::UART0_FR) & (1 << 4) != 0 {}
-    (mmio_read(Gpio::UART0_DR) & 0xFF) as u8
-}
-
-pub unsafe fn uart_puts(text: *const u8) {
-    for byte in text.iter().copied() {
-        uart_putc(byte);
+        mmio_write(Gpio::UART0_CR, (1 << 0) | (1 << 8) | (1 << 9));
     }
 }
 
-pub unsafe fn kernel_main(r0: u32, r1: u32, atags: u32) {
+pub unsafe fn uart_putc(c: u8) {
+    unsafe {
+        while mmio_read(Gpio::UART0_FR) & (1 << 5) != 0 {}
+        mmio_write(Gpio::UART0_DR, c as u32);
+    }
+}
+
+pub unsafe fn uart_getc() -> u8 {
+    unsafe {
+        while mmio_read(Gpio::UART0_FR) & (1 << 4) != 0 {}
+        (mmio_read(Gpio::UART0_DR) & 0xFF) as u8
+    }
+}
+
+pub unsafe fn uart_puts(text: *const u8) {
+    unsafe {
+        let mut i = 0;
+        while *text.add(i) != 0 {
+            uart_putc(*text.add(i));
+            i += 1;
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn kernel_main(r0: u32, r1: u32, atags: u32) {
     let _ = r0;
     let _ = r1;
     let _ = atags;
 
-    uart_init();
-    uart_puts(("Shubix\r\n" as u8));
+    unsafe {
+        uart_init();
+        uart_puts(b"Shubix\r\n\0".as_ptr());
 
-    loop {
-        uart_putc(uart_getc());
-        uart_putc('\n');
+        loop {
+            uart_putc(uart_getc());
+            uart_putc(b'\n');
+            // main control loop
+        }
     }
 }

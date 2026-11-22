@@ -2,7 +2,7 @@ ENTRY (_start)
 
 SECTIONS
 {
-    . = 0x80000000;
+    . = 0x8000;
     __start = .;
     __text_start = .;
     .text :
@@ -20,11 +20,14 @@ SECTIONS
     }
     . = ALIGN(4096);
 
+    __rodata_end = .;
     __data_start = .;
     .data :
     {
         *(.data*)
     }
+    . = ALIGN(4096);
+    __data_end = .;
 
     __bss_start = .;
     .bss :

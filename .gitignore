@@ -4,3 +4,5 @@
 /build/*.d
 /build/*.elf
 /build/*.img
+/build/*.a
+/build/*.log

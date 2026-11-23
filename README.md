@@ -1,5 +1,5 @@
-# shubix
+# Shubix
 
-Custom OS for Raspberry Pi (Work in Progress)
+Kernel for the Raspberry Pi 2 / Cortex-A7 implements parts 1–9 of https://jsandler18.github.io/
 
-I will be starting with https://jsandler18.github.io/ for a guide on Raspberry Pi OS development and then I will try my own things once I have a simple foundation built.
+Overhead software is my own things. I will mod the kernel if I feel it is necessary

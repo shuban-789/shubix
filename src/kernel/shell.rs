@@ -10,7 +10,7 @@ fn handle<const N: usize>(length: usize, line: [u8; N]) {
     let l: &str = str::from_utf8(&line).expect("Command tokens failed to convert to &str");
     match l {
         "help" => { commands::help() }
-        _ => { commands::invalid(line) }
+        _ => { commands::invalid(length, line) }
     }
 }
 
@@ -22,8 +22,11 @@ pub fn run() {
     loop {
         if let Some(byte) = unsafe { uart::uart_try_getc() } {
             if byte == '\n' as u8 || byte == '\r' as u8 || byte == 0x03 { // enter, ^C, etc
+                crate::kprintln!();
                 handle(len, line);
-                break;
+                len = 0;
+                crate::kprint!("{}", prompt());
+                continue;
             }
             if byte == 8 || byte == 127 { // handle backspace
                 if len > 0 {

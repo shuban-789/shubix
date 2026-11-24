@@ -46,32 +46,6 @@ pub fn halt() -> ! {
     }
 }
 
-fn terminal() {
-    let mut carriage_return = false;
-    loop {
-        if let Some(byte) = unsafe { uart::uart_try_getc() } {
-            match byte {
-                b'\r' => {
-                    console::putc(b'\n');
-                    carriage_return = true;
-                }
-                b'\n' if carriage_return => {
-                    carriage_return = false;
-                }
-                8 | 127 => {
-                    console::putc(8);
-                }
-                _ => {
-                    console::putc(byte);
-                    carriage_return = false;
-                }
-            }
-        } else {
-            process::sleep(10_000);
-        }
-    }
-}
-
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn kernel_main(_r0: u32, _r1: u32, atags: u32) -> ! {
     unsafe {
@@ -98,7 +72,7 @@ pub unsafe extern "C" fn kernel_main(_r0: u32, _r1: u32, atags: u32) -> ! {
             .expect("console thread allocation failed");
         timer::timer_init();
         kprintln!("Scheduler ready: 10 ms quantum");
-        kprintln!("we are so back!");
+        kprintln!();
         interrupts::enable();
         process::idle();
     }

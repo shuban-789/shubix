@@ -6,7 +6,9 @@ pub fn help() {
     crate::kprint!("help -> list available commands");
 }
 
-pub fn invalid<const N: usize>(line: [u8; N]) {
-    let l: &str = str::from_utf8(&line).expect("Command tokens failed to convert to &str");
-    crate::kprint!("Unknown: {}", l);
+pub fn invalid<const N: usize>(length: usize, line: [u8; N]) {
+    if length != 0 {
+        let l: &str = str::from_utf8(&line).expect("Command tokens failed to convert to &str");
+        crate::kprintln!("Unknown: {}", l);
+    }
 }

@@ -18,6 +18,7 @@ pub mod spinlock;
 pub mod timer;
 pub mod uart;
 pub mod shell;
+pub mod commands;
 
 use core::arch::{asm, global_asm};
 use core::panic::PanicInfo;
@@ -93,11 +94,11 @@ pub unsafe extern "C" fn kernel_main(_r0: u32, _r1: u32, atags: u32) -> ! {
         }
         interrupts::interrupts_init();
         process::process_init().expect("scheduler initialization failed");
-        process::create_kernel_thread(terminal, "Shell")
+        process::create_kernel_thread(shell::run, "Shell")
             .expect("console thread allocation failed");
         timer::timer_init();
         kprintln!("Scheduler ready: 10 ms quantum");
-        kprintln!("Hello, kernel World!");
+        kprintln!("we are so back!");
         interrupts::enable();
         process::idle();
     }

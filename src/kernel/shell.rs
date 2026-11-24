@@ -1,4 +1,4 @@
-use crate::{console, process, uart, commands};
+use crate::{console, process, windowing, commands};
 use core::str;
 
 fn prompt() -> &'static str {
@@ -14,13 +14,14 @@ fn handle<const N: usize>(length: usize, line: [u8; N]) {
     }
 }
 
+// todo: make posix compliant somehow; there is some guide somewhere
 pub fn run() {
     let mut line = [0u8; 128];
     let mut len = 0usize;
 
     crate::kprint!("{}", prompt());
     loop {
-        if let Some(byte) = unsafe { uart::uart_try_getc() } {
+        if let Some(byte) = windowing::try_read_byte() {
             if byte == '\n' as u8 || byte == '\r' as u8 || byte == 0x03 { // enter, ^C, etc
                 crate::kprintln!();
                 handle(len, line);

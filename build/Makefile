@@ -62,9 +62,6 @@ $(IMG): $(ELF) $(MAKEFILE) | check-tools
 run: check-runner $(ELF)
 	$(QEMU) -M raspi2b -cpu $(CPU) -display none -serial mon:stdio -kernel $(ELF)
 
-run-display: check-runner $(ELF)
-	$(QEMU) -M raspi2b -cpu $(CPU) -serial mon:stdio -kernel $(ELF)
-
 run-img: check-runner $(IMG)
 	$(QEMU) -M raspi2b -cpu $(CPU) -display none -serial mon:stdio -device loader,file=$(IMG),addr=0x8000,cpu-num=0,force-raw=on
 
@@ -77,5 +74,5 @@ dump: $(ELF)
 clean:
 	rm -f $(BOOT_O) $(KERNEL_LIB) $(KERNEL_DEPS) $(ELF) $(IMG)
 
-.PHONY: all check-target check-tools check-runner run run-display run-img debug dump clean
+.PHONY: all check-target check-tools check-runner run run-img debug dump clean
 -include $(KERNEL_DEPS)

@@ -1,9 +1,3 @@
-//! A small, read-only filesystem compiled into the kernel.
-//!
-//! `ROOT` is ready to use at boot; no initialization or heap allocation is needed.
-//! Add initial files to the arrays below. Writes, disk storage, permissions, and
-//! per-process file descriptors can be added in later steps.
-
 pub struct Node {
     pub name: &'static str,
     pub kind: NodeKind,

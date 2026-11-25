@@ -14,7 +14,7 @@ impl Write for Writer {
 }
 
 fn emit(byte: u8) {
-    if crate::windowing::putc(byte) {
+    if crate::interface::putc(byte) {
         return;
     }
     unsafe {

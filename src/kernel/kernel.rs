@@ -19,7 +19,8 @@ pub mod timer;
 pub mod uart;
 pub mod shell;
 pub mod commands;
-pub mod windowing;
+pub mod interface;
+pub mod fs;
 
 use core::arch::{asm, global_asm};
 use core::panic::PanicInfo;
@@ -67,7 +68,7 @@ pub unsafe extern "C" fn kernel_main(_r0: u32, _r1: u32, atags: u32) -> ! {
         kprintln!("Console: UART, ANSI text, 80x24");
         interrupts::interrupts_init();
         process::process_init().expect("scheduler initialization failed");
-        process::create_kernel_thread(windowing::run_terminal, "Terminal")
+        process::create_kernel_thread(interface::run_terminal, "Terminal")
             .expect("console thread allocation failed");
         timer::timer_init();
         kprintln!("Scheduler ready: 10 ms quantum");

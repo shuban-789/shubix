@@ -1,16 +1,22 @@
-use crate::{console, process, windowing, commands};
-use core::str;
+use crate::{console, process, interface, commands};
 
 fn prompt() -> &'static str {
-    // construct some complex prompt later via some external calls
+    // construct some complex prompt later via some external calls; further expand apis for fs operations
     "> "
 }
 
-fn handle<const N: usize>(length: usize, line: [u8; N]) {
-    let l: &str = str::from_utf8(&line).expect("Command tokens failed to convert to &str");
-    match l {
+fn handle<const N: usize>(length: usize, line: [u8; N]) { // match based off of PATH eventually after fs system is implemented
+    let l = core::str::from_utf8(&line[..length]).expect("Command tokens failed to convert to &str");
+    let mut tokens = l.split_ascii_whitespace();
+    let Some(command) = tokens.next() else {
+        return;
+    };
+
+    match command {
         "help" => { commands::help() }
-        _ => { commands::invalid(length, line) }
+        "ls" => { commands::ls(tokens) }
+        "cat" => { commands::cat(tokens) }
+        _ => { commands::invalid(command) }
     }
 }
 
@@ -21,7 +27,7 @@ pub fn run() {
 
     crate::kprint!("{}", prompt());
     loop {
-        if let Some(byte) = windowing::try_read_byte() {
+        if let Some(byte) = interface::try_read_byte() {
             if byte == '\n' as u8 || byte == '\r' as u8 || byte == 0x03 { // enter, ^C, etc
                 crate::kprintln!();
                 handle(len, line);

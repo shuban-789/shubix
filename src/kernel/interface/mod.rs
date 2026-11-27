@@ -19,6 +19,7 @@ pub enum Color {
     Default,
     Blue,
     Green,
+    Yellow,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

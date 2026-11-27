@@ -3,6 +3,13 @@ use super::{Cell, Color, MAX_COLUMNS, MAX_ROWS, Surface, input::Key, terminal::T
 const MIN_WIDTH: usize = 12;
 const MIN_HEIGHT: usize = 5;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    Shell,
+    Resize,
+    Move,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Rect {
     pub x: usize,
@@ -16,7 +23,7 @@ pub struct Desktop {
     bounds: Rect,
     columns: usize,
     rows: usize,
-    resizing: bool,
+    mode: Mode,
     previous: [Cell; MAX_COLUMNS * MAX_ROWS],
     painted: bool,
 }
@@ -33,7 +40,7 @@ impl Desktop {
             },
             columns: 0,
             rows: 0,
-            resizing: false,
+            mode: Mode::Shell,
             previous: [Cell::EMPTY; MAX_COLUMNS * MAX_ROWS],
             painted: false,
         }
@@ -48,10 +55,10 @@ impl Desktop {
         self.bounds = Rect {
             x: 1,
             y: 1,
-            width: (self.columns - 2).min(64),
-            height: (self.rows - 2).min(24),
+            width: self.columns - 2,
+            height: self.rows - 2,
         };
-        self.resizing = false;
+        self.mode = Mode::Shell;
         self.painted = false;
         self.terminal
             .resize(self.bounds.width - 2, self.bounds.height - 2);
@@ -62,35 +69,61 @@ impl Desktop {
         self.bounds
     }
     pub fn resizing(&self) -> bool {
-        self.resizing
+        self.mode == Mode::Resize
+    }
+    pub fn moving(&self) -> bool {
+        self.mode == Mode::Move
     }
 
     /// Return only input intended for the shell. Window commands never reach it.
     pub fn key(&mut self, key: Key) -> Option<u8> {
-        if key == Key::Resize {
-            self.resizing = !self.resizing;
+        let requested_mode = match key {
+            Key::Resize => Some(Mode::Resize),
+            Key::Move => Some(Mode::Move),
+            _ => None,
+        };
+        if let Some(mode) = requested_mode {
+            self.mode = if self.mode == mode { Mode::Shell } else { mode };
             return None;
         }
-        if !self.resizing {
+        if self.mode == Mode::Shell {
             return match key {
                 Key::Byte(byte) => Some(byte),
                 _ => None,
             };
         }
         let old = self.bounds;
-        match key {
-            Key::Left => self.bounds.width = self.bounds.width.saturating_sub(1).max(MIN_WIDTH),
-            Key::Right => {
-                self.bounds.width = (self.bounds.width + 1).min(self.columns - self.bounds.x - 1)
+        if matches!(key, Key::Byte(b'\r' | b'\n')) {
+            self.mode = Mode::Shell;
+        } else if self.mode == Mode::Move {
+            match key {
+                Key::Left => self.bounds.x = self.bounds.x.saturating_sub(1).max(1),
+                Key::Right => {
+                    self.bounds.x = (self.bounds.x + 1).min(self.columns - self.bounds.width - 1)
+                }
+                Key::Up => self.bounds.y = self.bounds.y.saturating_sub(1).max(1),
+                Key::Down => {
+                    self.bounds.y = (self.bounds.y + 1).min(self.rows - self.bounds.height - 1)
+                }
+                _ => {}
             }
-            Key::Up => self.bounds.height = self.bounds.height.saturating_sub(1).max(MIN_HEIGHT),
-            Key::Down => {
-                self.bounds.height = (self.bounds.height + 1).min(self.rows - self.bounds.y - 1)
+        } else {
+            match key {
+                Key::Left => self.bounds.width = self.bounds.width.saturating_sub(1).max(MIN_WIDTH),
+                Key::Right => {
+                    self.bounds.width =
+                        (self.bounds.width + 1).min(self.columns - self.bounds.x - 1)
+                }
+                Key::Up => {
+                    self.bounds.height = self.bounds.height.saturating_sub(1).max(MIN_HEIGHT)
+                }
+                Key::Down => {
+                    self.bounds.height = (self.bounds.height + 1).min(self.rows - self.bounds.y - 1)
+                }
+                _ => {}
             }
-            Key::Byte(b'\r' | b'\n') => self.resizing = false,
-            _ => {}
         }
-        if old != self.bounds {
+        if old.width != self.bounds.width || old.height != self.bounds.height {
             self.terminal
                 .resize(self.bounds.width - 2, self.bounds.height - 2);
         }
@@ -147,10 +180,10 @@ impl Desktop {
                 return Cell::new(self.terminal.cell(tx, ty) as char, Color::Default);
             }
         };
-        let fg = if self.resizing {
-            Color::Green
-        } else {
-            Color::Blue
+        let fg = match self.mode {
+            Mode::Shell => Color::Blue,
+            Mode::Resize => Color::Green,
+            Mode::Move => Color::Yellow,
         };
         let title = b" Terminal ";
         if cy == 0 && cx >= 1 && cx <= title.len() && cx < r.width - 1 {

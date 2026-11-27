@@ -2,6 +2,17 @@ use super::{MAX_COLUMNS, MAX_ROWS};
 
 const HISTORY: usize = 4096;
 
+#[derive(Clone, Copy)]
+enum Escape {
+    Ground,
+    Start,
+    Csi {
+        params: [usize; 2],
+        index: usize,
+        invalid: bool,
+    },
+}
+
 pub struct Terminal {
     cells: [u8; MAX_COLUMNS * MAX_ROWS],
     columns: usize,
@@ -11,6 +22,7 @@ pub struct Terminal {
     history: [u8; HISTORY],
     start: usize,
     length: usize,
+    escape: Escape,
 }
 
 impl Terminal {
@@ -24,6 +36,7 @@ impl Terminal {
             history: [0; HISTORY],
             start: 0,
             length: 0,
+            escape: Escape::Ground,
         }
     }
 
@@ -33,6 +46,7 @@ impl Terminal {
         self.cells.fill(b' ');
         self.x = 0;
         self.y = 0;
+        self.escape = Escape::Ground;
         for i in 0..self.length {
             self.apply(self.history[(self.start + i) % HISTORY]);
         }
@@ -72,6 +86,53 @@ impl Terminal {
     }
 
     fn apply(&mut self, byte: u8) {
+        if byte == 0x1b {
+            self.escape = Escape::Start;
+            return;
+        }
+        match self.escape {
+            Escape::Start => {
+                self.escape = if byte == b'[' {
+                    Escape::Csi {
+                        params: [0; 2],
+                        index: 0,
+                        invalid: false,
+                    }
+                } else {
+                    Escape::Ground
+                };
+                return;
+            }
+            Escape::Csi {
+                mut params,
+                mut index,
+                mut invalid,
+            } => {
+                match byte {
+                    b'0'..=b'9' => {
+                        params[index] = params[index]
+                            .saturating_mul(10)
+                            .saturating_add((byte - b'0') as usize);
+                    }
+                    b';' if index == 0 => index = 1,
+                    0x40..=0x7e => {
+                        self.escape = Escape::Ground;
+                        if !invalid {
+                            self.csi(byte, params, index);
+                        }
+                        return;
+                    }
+                    _ => invalid = true,
+                }
+                self.escape = Escape::Csi {
+                    params,
+                    index,
+                    invalid,
+                };
+                return;
+            }
+            Escape::Ground => {}
+        }
         match byte {
             b'\r' => self.x = 0,
             b'\n' => self.newline(),
@@ -93,14 +154,31 @@ impl Terminal {
             }
             0..=31 => {}
             _ => {
-                // Delay wrapping until another printable byte arrives: a newline
-                // after a full-width line must not create an extra blank line.
                 if self.x == self.columns {
                     self.newline();
                 }
                 self.cells[self.y * MAX_COLUMNS + self.x] = if byte < 127 { byte } else { b'?' };
                 self.x += 1;
             }
+        }
+    }
+
+    fn csi(&mut self, command: u8, params: [usize; 2], index: usize) {
+        match command {
+            b'H' | b'f' => {
+                self.y = params[0].saturating_sub(1).min(self.rows - 1);
+                self.x = params[1].saturating_sub(1).min(self.columns - 1);
+            }
+            b'J' if index == 0 => {
+                let cursor = self.y * MAX_COLUMNS + self.x.min(self.columns - 1);
+                match params[0] {
+                    0 => self.cells[cursor..].fill(b' '),
+                    1 => self.cells[..=cursor].fill(b' '),
+                    2 => self.cells.fill(b' '),
+                    _ => {}
+                }
+            }
+            _ => {}
         }
     }
 }

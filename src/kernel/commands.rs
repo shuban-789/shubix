@@ -1,15 +1,55 @@
+use crate::fs::FsError;
+use crate::kprint;
+use crate::spinlock::SpinLock;
 use crate::{console, fs};
+
+static CWD: SpinLock<&'static fs::Node> = SpinLock::new(&fs::hierarchy::ROOT);
+
+pub fn cwd() -> &'static fs::Node {
+    *CWD.lock()
+}
 
 pub fn help() {
     crate::kprintln!("help: list available commands");
-    crate::kprintln!("ls [PATH ...]: list files or directories (default: /)");
+    crate::kprintln!("ls [PATH ...]: list files or directories (default: current directory)");
     crate::kprintln!("cat FILE ...: print file contents");
+    crate::kprintln!("cd [PATH]: change directory (default: /)");
+    crate::kprintln!("pwd: print the current directory");
+    crate::kprintln!("clear: clear the terminal");
+}
+
+pub fn clear() {
+    kprint!("\x1b[2J\x1b[H");
+}
+
+pub fn pwd() {
+    crate::kprintln!("{}", fs::NodePath(cwd()));
+}
+
+pub fn cd<'a>(args: impl Iterator<Item = &'a str>) {
+    let mut args = args.peekable();
+    let first = args.next().unwrap_or("/");
+    let multiple = args.peek().is_some();
+    if multiple {
+        crate::kprintln!("cd: One argument expected. Multiple given");
+        return;
+    }
+    if let Err(error) = move_to(first) {
+        report_error("cd", first, error);
+    }
+}
+
+fn move_to(path: &str) -> Result<(), FsError> {
+    let node = resolve_path(path)?;
+    node.children()?;
+    *CWD.lock() = node;
+    Ok(())
 }
 
 pub fn ls<'a>(args: impl Iterator<Item = &'a str>) {
     let mut args = args.peekable();
     if args.peek().is_none() {
-        list_path("/");
+        list_path(".");
         return;
     }
 
@@ -59,19 +99,7 @@ pub fn cat<'a>(args: impl Iterator<Item = &'a str>) {
 }
 
 fn resolve_path(path: &str) -> Result<&'static fs::Node, fs::FsError> {
-    if path.starts_with('/') {
-        return fs::lookup(path);
-    }
-    if path.is_empty() || path.len() > 128 {
-        return Err(fs::FsError::InvalidPath);
-    }
-
-    let mut absolute = [0u8; 129];
-    absolute[0] = b'/';
-    absolute[1..path.len() + 1].copy_from_slice(path.as_bytes());
-    let absolute =
-        core::str::from_utf8(&absolute[..path.len() + 1]).map_err(|_| fs::FsError::InvalidPath)?;
-    fs::lookup(absolute)
+    fs::lookup_from(cwd(), path)
 }
 
 fn report_error(command: &str, path: &str, error: fs::FsError) {

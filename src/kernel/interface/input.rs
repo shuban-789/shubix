@@ -8,6 +8,7 @@ pub enum Key {
     Left,
     Right,
     Resize,
+    Move,
 }
 
 #[derive(Clone, Copy)]
@@ -41,6 +42,11 @@ impl Decoder {
         match self.state {
             State::Ground => Some(Key::Byte(byte)),
             State::Escape => {
+                // Alt prefixes Ctrl+Y with Escape on the serial terminal.
+                if byte == 0x19 {
+                    self.state = State::Ground;
+                    return Some(Key::Move);
+                }
                 self.state = match byte {
                     b'[' => State::Csi,
                     b'O' => State::Ss3,

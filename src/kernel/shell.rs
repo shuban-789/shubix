@@ -1,8 +1,7 @@
 use crate::{console, process, interface, commands};
 
-fn prompt() -> &'static str {
-    // construct some complex prompt later via some external calls; further expand apis for fs operations
-    "> "
+fn prompt() {
+    crate::kprint!("[{}]$ ", crate::fs::NodePath(commands::cwd()));
 }
 
 fn handle<const N: usize>(length: usize, line: [u8; N]) { // match based off of PATH eventually after fs system is implemented
@@ -16,6 +15,9 @@ fn handle<const N: usize>(length: usize, line: [u8; N]) { // match based off of 
         "help" => { commands::help() }
         "ls" => { commands::ls(tokens) }
         "cat" => { commands::cat(tokens) }
+        "cd" => { commands::cd(tokens) }
+        "clear" => { commands::clear() }
+        "pwd" => { commands::pwd() }
         _ => { commands::invalid(command) }
     }
 }
@@ -25,14 +27,14 @@ pub fn run() {
     let mut line = [0u8; 128];
     let mut len = 0usize;
 
-    crate::kprint!("{}", prompt());
+    prompt();
     loop {
         if let Some(byte) = interface::try_read_byte() {
             if byte == '\n' as u8 || byte == '\r' as u8 || byte == 0x03 { // enter, ^C, etc
                 crate::kprintln!();
                 handle(len, line);
                 len = 0;
-                crate::kprint!("{}", prompt());
+                prompt();
                 continue;
             }
             if byte == 8 || byte == 127 { // handle backspace

@@ -50,6 +50,7 @@ impl<W: Write> Surface for AnsiSurface<W> {
                 Color::Default => "\x1b[39;49m",
                 Color::Blue => "\x1b[38;5;33;49m",
                 Color::Green => "\x1b[38;5;40;49m",
+                Color::Yellow => "\x1b[38;5;226;49m",
             };
             let _ = self.output.write_str(style);
             self.foreground = Some(cell.foreground);
